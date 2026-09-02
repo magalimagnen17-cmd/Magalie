@@ -1,0 +1,38 @@
+$o=Get-CimInstance Win32_OperatingSystem;$c=Get-CimInstance Win32_ComputerSystem;$p=Get-CimInstance Win32_Processor|select -First 1
+$L=@()
+$L+="===== DIAGNOSTIC PC - $(Get-Date -Format 'dd/MM/yyyy HH:mm') ====="
+$L+="Windows      : $($o.Caption) $($o.OSArchitecture) build $($o.BuildNumber)"
+$L+="Machine      : $($c.Manufacturer) $($c.Model)"
+$L+="Processeur   : $($p.Name.Trim()) - $($p.NumberOfCores) coeurs - charge $($p.LoadPercentage)%"
+$L+="RAM totale   : $([math]::Round($c.TotalPhysicalMemory/1GB,1)) Go - utilisee $([math]::Round(100-($o.FreePhysicalMemory/$o.TotalVisibleMemorySize*100),0))%"
+$L+="Allume depuis: $([math]::Round(((Get-Date)-$o.LastBootUpTime).TotalDays,1)) jours"
+$L+=""
+$L+="----- DISQUES (LE PLUS IMPORTANT) -----"
+Get-PhysicalDisk|%{$L+="$($_.FriendlyName) | TYPE=$($_.MediaType) | Bus=$($_.BusType) | $([math]::Round($_.Size/1GB,0)) Go | Sante=$($_.HealthStatus)"}
+Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3"|%{$L+="Volume $($_.DeviceID) : $([math]::Round($_.FreeSpace/1GB,1)) Go libres sur $([math]::Round($_.Size/1GB,1)) Go ($([math]::Round($_.FreeSpace/$_.Size*100,0))% libre)"}
+$L+=""
+$L+="----- BARRETTES RAM -----"
+Get-CimInstance Win32_PhysicalMemory|%{$L+="$([math]::Round($_.Capacity/1GB,0)) Go @ $($_.Speed) MHz slot $($_.DeviceLocator)"}
+$L+="Slots totaux sur la carte mere : $((Get-CimInstance Win32_PhysicalMemoryArray|select -First 1).MemoryDevices)"
+$L+=""
+$L+="----- PROGRAMMES AU DEMARRAGE -----"
+Get-CimInstance Win32_StartupCommand|%{$L+="- $($_.Name)  [$($_.Location)]"}
+$L+=""
+$L+="----- TOP 12 PROCESSUS PAR MEMOIRE -----"
+Get-Process|sort WorkingSet64 -Desc|select -First 12|%{$L+=("{0,-30} {1,7} Mo" -f $_.ProcessName,[math]::Round($_.WorkingSet64/1MB,0))}
+$L+=""
+$L+="----- TOP 12 PROCESSUS PAR CPU CUMULE -----"
+Get-Process|sort CPU -Desc|select -First 12|%{$L+=("{0,-30} {1,7} s" -f $_.ProcessName,[math]::Round($_.CPU,0))}
+$L+=""
+$L+="----- ANTIVIRUS -----"
+Get-CimInstance -Namespace root\SecurityCenter2 -ClassName AntiVirusProduct -EA 0|%{$L+="- $($_.displayName)"}
+$L+=""
+$L+="----- ALIMENTATION -----"
+$L+=(powercfg /getactivescheme)
+$L+=""
+$L+="----- LOGICIELS INSTALLES -----"
+Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*' -EA 0|?{$_.DisplayName}|sort DisplayName|select -Unique DisplayName|%{$L+="- $($_.DisplayName)"}
+$L+=""
+$L+="----- ERREURS SYSTEME 7 DERNIERS JOURS -----"
+Get-WinEvent -FilterHashtable @{LogName='System';Level=1,2;StartTime=(Get-Date).AddDays(-7)} -MaxEvents 200 -EA 0|group ProviderName|sort Count -Desc|select -First 10|%{$L+="$($_.Count) x $($_.Name)"}
+$f="$env:USERPROFILE\Desktop\Diagnostic-PC.txt";$L|Out-File $f -Encoding UTF8;notepad $f
