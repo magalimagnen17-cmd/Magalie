@@ -79,8 +79,29 @@ W ""
 $dv = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion').DisplayVersion
 $os = Get-CimInstance Win32_OperatingSystem
 W ("Windows : " + $os.Caption + "   version " + $dv + "   build " + $os.BuildNumber)
-$region = (Get-ItemProperty 'HKCU:\Control Panel\International\Geo' -ErrorAction SilentlyContinue).Name
+# La region decide si Edge est desinstallable. Elle se lit a trois
+# endroits selon les installations, et la valeur Name manque souvent.
+$geo = Get-ItemProperty 'HKCU:\Control Panel\International\Geo' -ErrorAction SilentlyContinue
+$region = $geo.Name
+$geoId  = $geo.Nation
+if (-not $region) {
+  $hl = Get-WinHomeLocation -ErrorAction SilentlyContinue
+  if ($hl) { $region = $hl.HomeLocation; if (-not $geoId) { $geoId = $hl.GeoId } }
+}
+if (-not $region -and $geoId) {
+  # 84 est le code de la France dans la table des regions Windows
+  if ("$geoId" -eq "84") { $region = "France (code 84)" } else { $region = "code " + $geoId }
+}
+if (-not $region) { $region = "non lisible" }
 W ("Region declaree : " + $region)
+$europe = ($region -match "France|Belgi|Luxembourg|Suisse|Espagne|Italie|Allemagne|Portugal" -or "$geoId" -eq "84")
+if ($europe) {
+  W "   Region europeenne : la desinstallation officielle d'Edge est"
+  W "   en principe autorisee sur un Windows a jour."
+} else {
+  W "   Region non identifiee comme europeenne : le bouton"
+  W "   Desinstaller d'Edge sera probablement grise."
+}
 W ""
 
 # ---------- Edge ----------
@@ -124,9 +145,18 @@ if ($wv.Count -gt 0) {
 W ""
 
 # ---------- Navigateur par defaut ----------
+$chrome = @(
+  "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+  "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
+  "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
+) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($chrome) { W ("Chrome installe : " + (Get-Item -LiteralPath $chrome).VersionInfo.ProductVersion) }
+else { W "[!] Chrome n'est PAS installe sur cette machine." }
+
 $prog = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice' -ErrorAction SilentlyContinue).ProgId
 W ("Navigateur par defaut pour https : " + $(if ($prog) { $prog } else { "non lisible" }))
-if ($prog -like "*Edge*" -or $prog -like "*MSEdge*") {
+$edgeDefaut = ($prog -like "*Edge*" -or $prog -like "*MSEdge*")
+if ($edgeDefaut) {
   W "[!] Edge est le navigateur PAR DEFAUT."
   W "    A changer avant toute suppression, sinon les liens des"
   W "    mails et des documents n'ouvriront plus rien."
@@ -207,6 +237,11 @@ Write-Host "      Coupe le demarrage automatique, le prechargement au"
 Write-Host "      lancement de Windows et l'execution en arriere-plan."
 Write-Host "      Edge reste installe et utilisable si besoin."
 Write-Host ""
+Write-Host "   C  Mettre Chrome par defaut" -ForegroundColor White
+Write-Host "      A faire AVANT toute suppression. Windows n'autorise pas"
+Write-Host "      un script a changer ce reglage, le script ouvre donc la"
+Write-Host "      bonne page et indique les clics."
+Write-Host ""
 Write-Host "   D  Ouvrir la desinstallation officielle" -ForegroundColor White
 Write-Host "      Ouvre la fenetre Windows des applications installees."
 Write-Host "      Si le bouton Desinstaller est actif, la suppression"
@@ -214,7 +249,7 @@ Write-Host "      se fait proprement de la."
 Write-Host ""
 Write-Host "   R  Ne rien faire, garder le constat et les favoris" -ForegroundColor White
 Write-Host ""
-$choix = (Read-Host "  Votre choix (N / D / R)").Trim().ToUpper()
+$choix = (Read-Host "  Votre choix (N / C / D / R)").Trim().ToUpper()
 W ""
 W ("Choix : " + $choix)
 
@@ -258,9 +293,49 @@ if ($choix -eq "N") {
   W "avec l'editeur de registre, et redemarrer."
 }
 
+elseif ($choix -eq "C") {
+  W ""
+  W "--- NAVIGATEUR PAR DEFAUT ---"
+  if (-not $chrome) {
+    W "Chrome n'est pas installe : il n'y a rien vers quoi basculer."
+    W "Installer Chrome d'abord, sur google.com/chrome."
+  } else {
+    W "Depuis Windows 10 1803, ce reglage ne peut plus etre change par"
+    W "un script : Windows le protege pour empecher les logiciels de"
+    W "se designer eux-memes. Il se change a la main, une seule fois."
+    W ""
+    W "1. La fenetre Applications par defaut va s'ouvrir."
+    W "2. Descendre jusqu'a Navigateur Web."
+    W "3. Cliquer sur Microsoft Edge, choisir Google Chrome."
+    W "4. Si Windows propose d'essayer Edge d'abord, refuser."
+    W ""
+    W "Verification : cliquer sur un lien dans un mail. Il doit"
+    W "s'ouvrir dans Chrome."
+    Start-Process "ms-settings:defaultapps" -ErrorAction SilentlyContinue
+  }
+}
+
 elseif ($choix -eq "D") {
   W ""
   W "--- DESINSTALLATION OFFICIELLE ---"
+  if ($edgeDefaut) {
+    Write-Host ""
+    Write-Host "  ATTENTION : Edge est encore le navigateur par defaut." -ForegroundColor Red
+    Write-Host "  Le desinstaller maintenant laisserait Windows sans" -ForegroundColor Red
+    Write-Host "  navigateur associe aux liens." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  Ouvrir d'abord le reglage du navigateur par defaut ? (O/N)" -ForegroundColor Yellow
+    if ((Read-Host "  ").Trim().ToUpper() -eq "O") {
+      W "Ouverture du reglage du navigateur par defaut."
+      W "Basculer sur Chrome, puis relancer ce script pour desinstaller."
+      Start-Process "ms-settings:defaultapps" -ErrorAction SilentlyContinue
+      Write-Host ""
+      Write-Host "  Appuyez sur Entree pour fermer." -ForegroundColor Cyan
+      Read-Host
+      exit
+    }
+    W "Poursuite malgre Edge encore par defaut, a vos risques."
+  }
   W "Ouverture de la liste des applications installees."
   W ""
   W "Chercher 'Microsoft Edge' dans la liste, cliquer sur les trois"
