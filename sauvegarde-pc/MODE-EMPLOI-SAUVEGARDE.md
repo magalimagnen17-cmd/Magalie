@@ -14,24 +14,50 @@ qu'on copie.** D'où l'étape 1.
 Le script est en **lecture seule**. Il ne copie rien, ne déplace rien,
 ne supprime rien. Il mesure.
 
-### Version rapide, sans fichier à copier
+### Méthode principale : `INVENTAIRE.bat`
 
-Ouvrir `A-COLLER-INVENTAIRE.txt`, copier le bloc, le coller dans
-PowerShell. Un fichier `Inventaire-Rapide.txt` apparaît sur le Bureau.
+Un seul fichier, rien à taper, rien à coller.
 
-### Version complète
+1. Copier `INVENTAIRE.bat` sur le Bureau du PC de Magali.
+2. Double-cliquer dessus.
+3. Si Windows affiche « Windows a protégé votre ordinateur », cliquer
+   sur **Informations complémentaires** puis **Exécuter quand même**.
+   C'est l'avertissement standard pour tout fichier venu d'internet.
+4. Une fenêtre noire s'ouvre et affiche l'avancement, étape par étape.
+   Ne pas la fermer avant le message vert TERMINE.
+5. `Inventaire-Sauvegarde.txt` s'ouvre dans le Bloc-notes. Envoyer
+   son contenu.
 
-1. Copier `Inventaire-Sauvegarde.ps1` sur le Bureau du PC.
-2. Clic droit sur le bouton Démarrer, choisir **Terminal**.
-   Pas besoin du mode administrateur ici.
-3. Coller cette ligne puis Entrée :
+Le `.bat` contient le script PowerShell à la suite du code de
+lancement : il l'extrait dans le dossier temporaire, l'exécute avec
+la politique d'exécution contournée pour cette fois uniquement, et
+laisse la fenêtre ouverte quoi qu'il arrive. Aucun réglage Windows
+n'est modifié au passage.
 
-```
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Desktop\Inventaire-Sauvegarde.ps1"
-```
+### Si le `.bat` ne fonctionne pas
 
-4. Un fichier `Inventaire-Sauvegarde.txt` s'ouvre sur le Bureau.
-5. Envoyer son contenu.
+`A-COLLER-INVENTAIRE.txt` contient la même mesure en version courte,
+sur **une seule ligne** à coller dans PowerShell. Une seule ligne,
+c'est délibéré : un bloc sur plusieurs lignes collé dans la console
+la laisse en attente sur `>>` au lieu de s'exécuter, et donne
+l'impression que rien ne se passe. C'était le problème du premier
+essai.
+
+### Si rien de tout cela ne passe, la méthode manuelle
+
+Elle donne l'essentiel en trois minutes, sans aucun script.
+
+1. Ouvrir l'Explorateur de fichiers, aller dans `C:\Utilisateurs\<nom>`.
+2. Sélectionner les dossiers Bureau, Documents, Images, Vidéos,
+   Musique et Téléchargements ensemble.
+3. Clic droit, **Propriétés**. La taille totale et le nombre de
+   fichiers s'affichent, le calcul prend une minute ou deux.
+4. Répéter dossier par dossier pour savoir lequel pèse le plus.
+5. Relever aussi l'espace libre du disque `C:` (clic droit sur le
+   lecteur, Propriétés) et la place restante sur drive.google.com,
+   affichée en bas à gauche.
+
+Ces trois chiffres suffisent pour décider de la suite.
 
 ### Ce que l'inventaire va trancher
 

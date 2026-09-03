@@ -1,55 +1,30 @@
-INVENTAIRE RAPIDE AVANT SAUVEGARDE - version a coller directement
-=================================================================
+INVENTAIRE RAPIDE - methode de secours
+======================================
 
-Pas besoin d'etre administrateur. Ce bloc ne modifie rien.
-Il donne en 1 a 2 minutes les volumes a sauvegarder.
+A n'utiliser que si le fichier INVENTAIRE.bat n'a pas fonctionne.
 
-1. Clic droit sur le bouton Demarrer > Terminal  (ou Windows PowerShell)
-2. Selectionner tout le bloc ci-dessous, copier
-3. Clic droit dans la fenetre bleue pour coller, puis Entree
-4. Un fichier Inventaire-Rapide.txt s'ouvre sur le Bureau, l'envoyer
+POURQUOI CA NE MARCHAIT PAS AVANT
+Le bloc precedent tenait sur plusieurs lignes. Colle dans PowerShell,
+la console attendait la suite au lieu d'executer, en affichant  >>
+Resultat : rien ne se passait. Ici tout tient sur UNE SEULE ligne,
+le probleme ne peut plus se produire.
 
+MARCHE A SUIVRE
+1. Clic droit sur le bouton Demarrer, choisir Terminal
+   (ou Windows PowerShell). Pas besoin d'administrateur.
+2. Ci-dessous, tout ce qui est entre les deux lignes de tirets est
+   UNE SEULE LIGNE, meme si l'affichage la replie. Tout selectionner.
+3. Copier (Ctrl+C), puis clic droit dans la fenetre bleue pour coller.
+4. Appuyer sur Entree UNE fois.
+5. Les mesures defilent en gris. A la fin, Inventaire-Rapide.txt
+   s'ouvre dans le Bloc-notes. Envoyer son contenu.
 
-------------------------- DEBUT DU BLOC -------------------------
+Si le curseur affiche  >>  au lieu de demarrer, appuyer sur Entree
+une deuxieme fois.
 
-$ErrorActionPreference="SilentlyContinue"
-function Go($o){ if($o -ge 1GB){"{0:N2} Go" -f ($o/1GB)} elseif($o -ge 1MB){"{0:N0} Mo" -f ($o/1MB)} else {"{0:N0} Ko" -f ($o/1KB)} }
-function Mes($c){ if(-not(Test-Path -LiteralPath $c)){return $null}; $s=[int64]0; $n=0; $p=New-Object System.Collections.Stack; $p.Push($c)
-  while($p.Count -gt 0){ $d=$p.Pop(); try{$it=Get-ChildItem -LiteralPath $d -Force -ErrorAction Stop}catch{continue}
-    foreach($i in $it){ if($i.Attributes -band [IO.FileAttributes]::ReparsePoint){continue}
-      if($i.PSIsContainer){$p.Push($i.FullName)}else{$s+=$i.Length;$n++} } }
-  [pscustomobject]@{O=$s;N=$n} }
-$o="$env:USERPROFILE\Desktop\Inventaire-Rapide.txt"; $L=@()
-$L+="INVENTAIRE RAPIDE  -  $env:COMPUTERNAME / $env:USERNAME  -  $(Get-Date -Format 'dd/MM/yyyy HH:mm')"
-$L+=""; $L+="=== ESPACE DISQUE ==="
-Get-WmiObject Win32_LogicalDisk -Filter "DriveType=3" | %{ $L+=("{0} Total {1,10}  Libre {2,10}" -f $_.DeviceID,(Go $_.Size),(Go $_.FreeSpace)) }
-$L+=""; $L+="=== DOSSIERS PERSONNELS ==="
-$r="HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"
-$k=[ordered]@{Bureau="Desktop";Documents="Personal";Images="My Pictures";Videos="My Video";Musique="My Music";Telechargements="{374DE290-123F-4565-9164-39C4925E467B}"}
-$T=[int64]0
-foreach($n in $k.Keys){ $b=(Get-ItemProperty -Path $r -Name $k[$n]).($k[$n])
-  if([string]::IsNullOrWhiteSpace($b)){$c=Join-Path $env:USERPROFILE $n}else{$c=[Environment]::ExpandEnvironmentVariables($b)}
-  Write-Host "  mesure $n ..." -ForegroundColor Gray
-  $m=Mes $c; if($m -eq $null){$L+=("{0,-16} introuvable" -f $n);continue}
-  $T+=$m.O; $f=""; if($c -like "*OneDrive*"){$f="  [dans OneDrive]"}
-  $L+=("{0,-16} {1,10}  {2,6} fichiers  {3}{4}" -f $n,(Go $m.O),$m.N,$c,$f) }
-$L+=""; $L+=("TOTAL dossiers personnels : "+(Go $T))
-$L+=""; $L+="=== MAILS OUTLOOK ==="
-$ml=@(); foreach($z in @("$env:USERPROFILE\Documents","$env:LOCALAPPDATA\Microsoft\Outlook","$env:USERPROFILE\Desktop")){
-  if(Test-Path -LiteralPath $z){ $ml+=Get-ChildItem -LiteralPath $z -Recurse -File -Force | ?{$_.Extension -eq ".pst" -or $_.Extension -eq ".ost"} } }
-$ml=@($ml|Sort-Object FullName -Unique)
-if($ml.Count -eq 0){$L+="Aucun .pst / .ost. Pas d'archive mail locale a sauvegarder."}
-else{ foreach($f in $ml){ $t2="  (A SAUVEGARDER)"; if($f.Extension -eq ".ost"){$t2="  (cache, inutile)"}
-  $L+=("{0,10}  {1}{2}" -f (Go $f.Length),$f.FullName,$t2) } }
-$L+=""; $L+="=== NAVIGATEURS ==="
-foreach($n in @(@("Chrome","$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Bookmarks"),@("Edge","$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Bookmarks"))){
-  if(Test-Path -LiteralPath $n[1]){$L+=("{0} present" -f $n[0])} }
-if(Test-Path "$env:APPDATA\Mozilla\Firefox\Profiles"){$L+="Firefox present"}
-$L+=""; $L+="=== AUTRES COMPTES ==="
-Get-ChildItem C:\Users -Directory -Force | ?{$_.Name -notin @("Public","Default","Default User","All Users")} | %{ $L+=("{0,-22} activite {1:dd/MM/yyyy}" -f $_.Name,$_.LastWriteTime) }
-$L+=""; $L+="=== REPERE ==="
-$L+="Un compte Google gratuit = 15 Go partages entre Drive, Gmail et Photos."
-$L -join "`r`n" | Out-File $o -Encoding UTF8
-Write-Host "`n  TERMINE : $o" -ForegroundColor Green; notepad $o
+Ce bloc ne modifie rien sur le PC. Il mesure, il ecrit un fichier
+texte sur le Bureau, c'est tout.
 
--------------------------- FIN DU BLOC --------------------------
+-------------------------------------------------------------------
+$ErrorActionPreference="SilentlyContinue"; function Go($o){ if($o -ge 1GB){"{0:N2} Go" -f ($o/1GB)}elseif($o -ge 1MB){"{0:N0} Mo" -f ($o/1MB)}else{"{0:N0} Ko" -f ($o/1KB)} }; function Mes($c){ if(-not(Test-Path -LiteralPath $c)){return $null}; $s=[int64]0;$n=0;$p=New-Object System.Collections.Stack;$p.Push($c); while($p.Count -gt 0){ $d=$p.Pop(); try{$it=Get-ChildItem -LiteralPath $d -Force -ErrorAction Stop}catch{continue}; foreach($i in $it){ if($i.Attributes -band [IO.FileAttributes]::ReparsePoint){continue}; if($i.PSIsContainer){$p.Push($i.FullName)}else{$s+=$i.Length;$n++} } }; New-Object PSObject -Property @{O=$s;N=$n} }; $r="HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"; $bu=(Get-ItemProperty $r -Name Desktop).Desktop; if($bu){$bu=[Environment]::ExpandEnvironmentVariables($bu)}; if(-not $bu -or -not(Test-Path -LiteralPath $bu)){$bu=$env:TEMP}; $o=Join-Path $bu "Inventaire-Rapide.txt"; $L=@(); $L+="INVENTAIRE RAPIDE  $env:COMPUTERNAME / $env:USERNAME  $(Get-Date -Format 'dd/MM/yyyy HH:mm')"; $L+="Bureau : $bu"; $L+=""; $L+="=== DISQUES ==="; Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | %{ $L+=("{0} Total {1,10}  Libre {2,10}" -f $_.DeviceID,(Go $_.Size),(Go $_.FreeSpace)) }; $L+=""; $L+="=== DOSSIERS PERSONNELS ==="; $k=@(@("Bureau","Desktop"),@("Documents","Personal"),@("Images","My Pictures"),@("Videos","My Video"),@("Musique","My Music"),@("Telechargements","{374DE290-123F-4565-9164-39C4925E467B}")); $T=[int64]0; foreach($e in $k){ $b=(Get-ItemProperty $r -Name $e[1]).($e[1]); if([string]::IsNullOrEmpty($b)){$c=Join-Path $env:USERPROFILE $e[0]}else{$c=[Environment]::ExpandEnvironmentVariables($b)}; Write-Host ("  mesure de "+$e[0]+" ...") -ForegroundColor Gray; $m=Mes $c; if($m -eq $null){$L+=("{0,-16} introuvable" -f $e[0]);continue}; $T+=$m.O; $f=""; if($c -like "*OneDrive*"){$f="   [DEJA DANS ONEDRIVE]"}; $L+=("{0,-16} {1,10}  {2,6} fichiers  {3}{4}" -f $e[0],(Go $m.O),$m.N,$c,$f) }; $L+=""; $L+=("TOTAL dossiers personnels : "+(Go $T)); $L+=""; $L+="=== MAILS OUTLOOK ==="; $ml=@(); foreach($z in @("$env:USERPROFILE\Documents","$env:LOCALAPPDATA\Microsoft\Outlook",$bu)){ if(Test-Path -LiteralPath $z){$ml+=Get-ChildItem -LiteralPath $z -Recurse -File -Force | ?{$_.Extension -eq ".pst" -or $_.Extension -eq ".ost"}} }; $ml=@($ml|Sort-Object FullName -Unique); if($ml.Count -eq 0){$L+="Aucun .pst / .ost, pas d archive mail locale"}else{foreach($f in $ml){$L+=("{0,10}  {1}" -f (Go $f.Length),$f.FullName)}}; $L+=""; $L+="=== AUTRES COMPTES ==="; Get-ChildItem C:\Users -Directory -Force | ?{@("Public","Default","Default User","All Users") -notcontains $_.Name} | %{ $L+=("{0,-22} activite {1:dd/MM/yyyy}" -f $_.Name,$_.LastWriteTime) }; $L -join "`r`n" | Out-File $o -Encoding UTF8; Write-Host ""; Write-Host "  TERMINE : $o" -ForegroundColor Green; notepad $o
+-------------------------------------------------------------------
