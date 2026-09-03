@@ -21,7 +21,8 @@ toujours moins de 15 Go réellement libres. À relever sur
 drive.google.com, en bas à gauche.
 
 Si le volume mesuré dépasse : trier et n'envoyer que l'essentiel,
-passer à 200 Go pour environ 2 euros par mois, ou faire les photos et
+prendre un forfait Google One de 100 ou 200 Go, quelques euros par
+mois selon la grille en vigueur, ou faire les photos et
 vidéos par disque externe et ne garder que les documents dans Drive.
 
 ## Condition 2 : aucun dossier déjà géré par OneDrive

@@ -379,9 +379,9 @@ if ($utile -lt 10GB) {
   W "-> Le volume utile tient dans un Drive gratuit. Sauvegarde simple."
 } elseif ($utile -lt 100GB) {
   W "-> Trop gros pour un Drive gratuit tel quel. Trois voies :"
-  W "   trier et n'envoyer que l'essentiel, prendre 200 Go de"
-  W "   stockage Google pour environ 2 euros par mois, ou passer"
-  W "   par un disque dur externe."
+  W "   trier et n'envoyer que l'essentiel, prendre un forfait"
+  W "   Google One de 100 ou 200 Go pour quelques euros par mois,"
+  W "   ou passer par un disque dur externe."
 } else {
   W "-> Volume important. Le disque dur externe est la bonne solution."
   W "   Drive servira pour les documents seulement."
