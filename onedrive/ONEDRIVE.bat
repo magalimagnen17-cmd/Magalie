@@ -496,7 +496,9 @@ elseif ($choix -eq "D") {
     W ""
     W "--- CE QUI N'A PAS ETE TOUCHE ---"
     foreach ($d in $dossiers) {
-      W ("Le dossier " + $d + " et ses " + $nbOD + " fichiers sont intacts.")
+      $n3 = @(Get-ChildItem -LiteralPath $d -Recurse -File -Force -ErrorAction SilentlyContinue).Count
+      W ("Le dossier " + $d)
+      W ("   contient toujours " + $n3 + " fichiers.")
     }
     W "Aucun document n'a ete supprime. Les fichiers restent"
     W "egalement disponibles sur onedrive.com."

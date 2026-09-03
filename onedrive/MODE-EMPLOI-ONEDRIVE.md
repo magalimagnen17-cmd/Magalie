@@ -122,3 +122,34 @@ professionnel est détecté, le script propose de le copier sur le Bureau
 avant de désinstaller, et vérifie que le nombre de fichiers copiés
 correspond. Une copie incomplète est signalée, et dans ce cas il ne
 faut pas désinstaller.
+
+## Résultat, 03/09/2026 19:57
+
+Désinstallation effectuée, code de retour 0. Lancement automatique
+retiré, 2 tâches planifiées supprimées, icône masquée dans
+l'Explorateur.
+
+Un défaut d'affichage a été corrigé au passage : le compte rendu
+attribuait 477 fichiers au dossier `C:\Users\fctot\OneDrive`, qui est
+vide. Le compteur global était réutilisé pour chaque ligne au lieu du
+compte propre à chaque dossier. Seuls les chiffres affichés étaient
+faux, aucun fichier n'a été touché.
+
+### Ce qu'il reste à faire
+
+**Redémarrer**, pour que l'Explorateur prenne en compte la
+disparition. Relancer ensuite `ONEDRIVE.bat` et choisir `N` : le
+constat seul confirme que OneDrive n'est pas revenu.
+
+**Traiter les 477 fichiers de la Ligue de Football de Normandie.**
+Ils sont toujours sur le disque, dans
+`C:\Users\fctot\OneDrive - LIGUE DE FOOTBALL DE NORMANDIE`, mais plus
+rien ne les synchronise. Ce dossier est désormais une copie locale
+isolée, sans filet.
+
+379 Mo tiennent sans difficulté dans les 13,20 Go disponibles du Drive.
+Le plus simple, sans aucun script : ouvrir l'Explorateur, glisser le
+dossier dans `G:\Mon Drive`, attendre que l'icône passe au vert.
+
+**Le dossier `C:\Users\fctot\OneDrive`**, vide, peut être supprimé.
+Rien ne s'y trouve.
