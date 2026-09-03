@@ -158,24 +158,73 @@ if ($ev.Count -eq 0) {
     W ("{0,-20} {1,9:N1} s {2,9:N1} s" -f $b.Date.ToString("dd/MM/yyyy HH:mm"), $b.Bureau, $b.Total)
   }
   W ""
-  if ($boots.Count -ge 4) {
-    $n = [math]::Max(2, [math]::Floor($boots.Count / 3))
-    $vieux = $boots | Select-Object -First $n
-    $neufs = $boots | Select-Object -Last $n
-    $mv = ($vieux | Measure-Object Bureau -Average).Average
-    $mn = ($neufs | Measure-Object Bureau -Average).Average
-    W ("Moyenne des " + $n + " premiers demarrages enregistres : {0:N1} s" -f $mv)
-    W ("Moyenne des " + $n + " derniers                        : {0:N1} s" -f $mn)
-    if ($mv -gt 0) {
-      $g = [math]::Round(($mv - $mn) / $mv * 100, 0)
-      W ""
-      if ($g -gt 5)      { W ("-> Demarrage plus rapide de " + $g + " %, soit {0:N0} secondes gagnees." -f ($mv - $mn)) }
-      elseif ($g -lt -5) { W ("-> Demarrage plus lent de " + [math]::Abs($g) + " %.") }
-      else               { W "-> Pas d'ecart significatif sur le temps de demarrage." }
-    }
+  # La coupure se fait a la date de l'intervention, pas en decoupant
+  # l'historique en tiers : comparer 2024 a 2026 mesurerait le
+  # vieillissement de la machine, pas l'effet du nettoyage.
+  $charniere = $null
+  $dg = @(Get-ChildItem -LiteralPath $bureau -Filter "Diagnostic-PC*.txt" -File -ErrorAction SilentlyContinue |
+          Sort-Object LastWriteTime)
+  if ($dg.Count -gt 0) {
+    $charniere = $dg[0].LastWriteTime
+    W ("Date de reference : " + $charniere.ToString("dd/MM/yyyy HH:mm"))
+    W ("d'apres le premier rapport de diagnostic, " + $dg[0].Name + ",")
+    W "genere juste avant l'intervention."
   } else {
-    W "Trop peu de demarrages enregistres pour degager une tendance."
-    W "Redemarrer deux ou trois fois donnera de quoi comparer."
+    Write-Host ""
+    Write-Host "  A quelle date la machine a-t-elle ete nettoyee ?" -ForegroundColor Yellow
+    Write-Host "  Format JJ/MM/AAAA, ou Entree pour prendre hier." -ForegroundColor Yellow
+    $rep = (Read-Host "  ").Trim()
+    if ($rep) { $charniere = [datetime]::ParseExact($rep, "dd/MM/yyyy", $null) }
+    if (-not $charniere) { $charniere = (Get-Date).AddDays(-1).Date }
+    W ("Date de reference saisie : " + $charniere.ToString("dd/MM/yyyy"))
+  }
+  W ""
+
+  $avant = @($boots | Where-Object { $_.Date -lt $charniere })
+  $apres = @($boots | Where-Object { $_.Date -ge $charniere })
+
+  function Mediane($v){
+    $t = @($v | Sort-Object)
+    if ($t.Count -eq 0) { return $null }
+    if ($t.Count % 2 -eq 1) { return $t[[math]::Floor($t.Count/2)] }
+    return ($t[$t.Count/2 - 1] + $t[$t.Count/2]) / 2
+  }
+
+  if ($apres.Count -eq 0) {
+    W "Aucun demarrage enregistre depuis cette date."
+    W "Redemarrer la machine deux ou trois fois donnera de quoi comparer."
+  } elseif ($avant.Count -eq 0) {
+    W "Aucun demarrage enregistre avant cette date, comparaison impossible."
+  } else {
+    $medA = Mediane ($avant | ForEach-Object { $_.Bureau })
+    $medP = Mediane ($apres | ForEach-Object { $_.Bureau })
+    $dernierAvant = ($avant | Select-Object -Last 1).Bureau
+    $dernierApres = ($apres | Select-Object -Last 1).Bureau
+
+    W ("Avant : " + $avant.Count + " demarrages, mediane {0:N1} s" -f $medA)
+    W ("Apres : " + $apres.Count + " demarrages, mediane {0:N1} s" -f $medP)
+    W ""
+    W ("Dernier demarrage avant l'intervention : {0:N1} s" -f $dernierAvant)
+    W ("Dernier demarrage apres                : {0:N1} s" -f $dernierApres)
+    W ""
+    # La mediane resiste aux valeurs extremes, frequentes ici : une
+    # mise a jour de Windows peut tripler un demarrage isole.
+    if ($medA -gt 0) {
+      $g = [math]::Round(($medA - $medP) / $medA * 100, 0)
+      if ($g -gt 5)      { W ("-> Mediane amelioree de " + $g + " %, soit {0:N0} secondes." -f ($medA - $medP)) }
+      elseif ($g -lt -5) { W ("-> Mediane degradee de " + [math]::Abs($g) + " %.") }
+      else               { W "-> Mediane stable." }
+    }
+    $best = ($boots | Sort-Object Bureau | Select-Object -First 1)
+    W ("Meilleur demarrage de tout l'historique : {0:N1} s, le {1}" -f $best.Bureau, $best.Date.ToString("dd/MM/yyyy"))
+    W ""
+    if ($apres.Count -lt 3) {
+      W ("Reserve : " + $apres.Count + " demarrage(s) seulement depuis l'intervention.")
+      W "Deux mesures ne font pas une tendance. Le premier redemarrage"
+      W "apres un nettoyage est d'ailleurs toujours le plus lent, le"
+      W "temps que Windows reconstruise ses caches. Redemarrer encore"
+      W "deux ou trois fois donnera un resultat solide."
+    }
   }
 }
 
@@ -221,6 +270,16 @@ if ($fics.Count -lt 2) {
 # ---------- 3. Mesures du moment ----------
 Write-Host "  3/3  Mesure de vitesse (disque et processeur)..." -ForegroundColor Gray
 T "VITESSE MESUREE MAINTENANT"
+# Get-PhysicalDisk dit le type de disque de facon fiable. Le
+# chronometre qui suit ne sert qu'a confirmer un ordre de grandeur.
+$pd = @(Get-PhysicalDisk -ErrorAction SilentlyContinue)
+if ($pd.Count -gt 0) {
+  foreach ($d in $pd) { W ("Disque declare par Windows : " + $d.FriendlyName + "   type " + $d.MediaType + "   sante " + $d.HealthStatus) }
+} else {
+  W "Type de disque illisible (droits administrateur necessaires)."
+}
+W ""
+
 $test = Join-Path $env:TEMP ("perf-" + [guid]::NewGuid().ToString("N") + ".tmp")
 $bloc = New-Object byte[] (4MB)
 (New-Object Random).NextBytes($bloc)
@@ -236,14 +295,28 @@ try {
   $ecr = 100 / $sw.Elapsed.TotalSeconds
   W ("Ecriture de 100 Mo : {0,6:N0} Mo/s" -f $ecr)
 
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $fs = [System.IO.File]::OpenRead($test)
-  $buf = New-Object byte[] (4MB)
-  while ($fs.Read($buf, 0, $buf.Length) -gt 0) { }
-  $fs.Close()
-  $sw.Stop()
-  $lec = 100 / $sw.Elapsed.TotalSeconds
-  W ("Lecture  de 100 Mo : {0,6:N0} Mo/s" -f $lec)
+  # Relire le fichier qu'on vient d'ecrire mesurerait le cache memoire
+  # de Windows, pas le disque : on lit un fichier deja present, assez
+  # gros et non touche recemment.
+  $lec = $null
+  $cible = @(Get-ChildItem -LiteralPath "$env:SystemRoot\System32" -File -Filter "*.dll" -ErrorAction SilentlyContinue |
+             Where-Object { $_.Length -gt 8MB } | Sort-Object Length -Descending | Select-Object -First 3)
+  if ($cible.Count -gt 0) {
+    $octets = 0
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    foreach ($c in $cible) {
+      $fs = [System.IO.File]::OpenRead($c.FullName)
+      $buf = New-Object byte[] (4MB)
+      while ($fs.Read($buf, 0, $buf.Length) -gt 0) { }
+      $fs.Close()
+      $octets += $c.Length
+    }
+    $sw.Stop()
+    $lec = ($octets/1MB) / $sw.Elapsed.TotalSeconds
+    W ("Lecture  de {0,3:N0} Mo : {1,6:N0} Mo/s" -f ($octets/1MB), $lec)
+    W "   (mesure sur des fichiers systeme deja presents ; si Windows"
+    W "    les avait deja en memoire, ce chiffre est optimiste)"
+  }
 } catch {
   W ("Mesure disque impossible : " + $_.Exception.Message)
   $ecr = $null; $lec = $null
@@ -262,6 +335,11 @@ W "Reperes pour le disque, en lecture :"
 W "   disque mecanique (HDD)   :   80 a 120 Mo/s"
 W "   SSD sur port SATA        :  400 a 550 Mo/s"
 W "   SSD NVMe                 : 1500 Mo/s et au-dela"
+W ""
+W "L'ecriture est la mesure la plus fiable des deux : elle force"
+W "l'ecriture physique sur le disque, alors qu'une lecture peut"
+W "toujours etre servie par la memoire. Une ecriture sous 100 Mo/s"
+W "est le signe d'un disque mecanique, ou d'un SSD en fin de vie."
 if ($lec) {
   W ""
   if ($lec -lt 200)      { W "-> Mesure typique d'un disque mecanique. C'est le premier"
