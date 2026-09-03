@@ -69,3 +69,56 @@ pour l'empêcher définitivement de revenir, mais elle touche à la
 configuration système de la machine entière : autant la poser
 sciemment, en connaissance de cause, que l'inclure dans un script de
 désinstallation.
+
+---
+
+## Cas rencontré sur cette machine, le 03/09/2026
+
+Le premier passage n'a rien désinstallé : le rapport se termine par
+`Choix : D` puis `Desinstallation annulee`. La demande de confirmation
+n'attendait que le mot `OUI` exactement, et toute autre saisie annulait
+sans le dire clairement. Corrigé : `O`, `OUI`, `OK`, `Y` et `YES` sont
+désormais acceptés, l'invite est explicite, et une réponse non reconnue
+est affichée telle qu'elle a été saisie.
+
+Le constat a surtout révélé quelque chose de plus important.
+
+**Deux espaces OneDrive coexistent sur ce PC :**
+
+| Dossier | Contenu |
+|---|---|
+| `C:\Users\fctot\OneDrive` | **vide**, 0 fichier |
+| `C:\Users\fctot\OneDrive - LIGUE DE FOOTBALL DE NORMANDIE` | **477 fichiers, 379 Mo** |
+
+Le OneDrive personnel ne sert à rien. Celui qui travaille est un espace
+**professionnel Microsoft 365**, rattaché à une organisation.
+
+Cela change deux choses.
+
+D'abord, c'est probablement la cause de la boucle. Un OneDrive
+d'organisation qui tourne en rond, c'est en général un accès qui n'est
+plus valide : mot de passe changé, session expirée, licence ou compte
+retiré par l'organisation. OneDrive réessaie indéfiniment sans jamais
+afficher clairement pourquoi.
+
+Ensuite, cela rend la désinstallation plus délicate qu'elle n'en avait
+l'air. Les 477 fichiers sont bien physiquement sur le disque, donc rien
+ne disparaît. Mais **ce qui n'a pas encore été envoyé vers
+l'organisation ne partira jamais** si on désinstalle. Et une
+synchronisation qui tourne en rond est précisément une synchronisation
+qui n'aboutit pas : il est donc possible que des modifications récentes
+n'aient jamais atteint le cloud.
+
+D'où deux ajouts au script.
+
+**L'option L, dissocier un compte.** Elle arrête la synchronisation
+d'un compte précis, laisse ses fichiers sur le disque, ne supprime rien
+en ligne, et laisse OneDrive installé. C'est la bonne réponse quand la
+boucle vient d'un compte professionnel devenu invalide, et c'est
+réversible d'une reconnexion.
+
+**La copie de sécurité avant désinstallation.** Si un espace
+professionnel est détecté, le script propose de le copier sur le Bureau
+avant de désinstaller, et vérifie que le nombre de fichiers copiés
+correspond. Une copie incomplète est signalée, et dans ce cas il ne
+faut pas désinstaller.

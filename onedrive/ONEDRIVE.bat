@@ -36,6 +36,8 @@ $ProgressPreference    = "SilentlyContinue"
 
 $L = New-Object System.Collections.ArrayList
 function W($t){ [void]$L.Add([string]$t); Write-Host $t }
+$adm = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
+       ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 function Go($o){
   if ($o -eq $null) { return "?" }
   if ($o -ge 1GB) { return ("{0:N2} Go" -f ($o/1GB)) }
@@ -74,6 +76,7 @@ W "profil-la, et sur aucun autre. Verifiez que c'est le bon."
 W ""
 
 # ---------- Processus ----------
+$bureauCopie = CheminBureau
 $proc = @(Get-Process -Name "OneDrive" -ErrorAction SilentlyContinue)
 if ($proc.Count -gt 0) {
   $mo = [math]::Round(($proc | Measure-Object WorkingSet64 -Sum).Sum/1MB,0)
@@ -83,11 +86,40 @@ if ($proc.Count -gt 0) {
 }
 
 # ---------- Installation ----------
-$setup = @(
-  (Join-Path $env:SystemRoot "SysWOW64\OneDriveSetup.exe"),
-  (Join-Path $env:SystemRoot "System32\OneDriveSetup.exe"),
-  (Join-Path $env:LOCALAPPDATA "Microsoft\OneDrive\OneDriveSetup.exe")
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+# La UninstallString du registre fait foi : selon l'installation,
+# OneDrive est pose par utilisateur ou pour toute la machine, et le
+# desinstalleur n'est alors ni au meme endroit ni lancable pareil.
+$candidats = @()
+$portee = "inconnue"
+foreach ($base in @(
+    @("HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\OneDriveSetup.exe", "utilisateur"),
+    @("HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\OneDriveSetup.exe", "machine"),
+    @("HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\OneDriveSetup.exe", "machine"))) {
+  $u = (Get-ItemProperty -Path $base[0] -ErrorAction SilentlyContinue).UninstallString
+  if ($u) {
+    $portee = $base[1]
+    $candidats += New-Object PSObject -Property @{ Ligne=$u; Source=("registre " + $base[1]) }
+  }
+}
+foreach ($c in @(
+    (Join-Path $env:SystemRoot "SysWOW64\OneDriveSetup.exe"),
+    (Join-Path $env:SystemRoot "System32\OneDriveSetup.exe"),
+    (Join-Path $env:LOCALAPPDATA "Microsoft\OneDrive\OneDriveSetup.exe"),
+    (Join-Path $env:ProgramFiles "Microsoft OneDrive\OneDriveSetup.exe"),
+    (Join-Path ${env:ProgramFiles(x86)} "Microsoft OneDrive\OneDriveSetup.exe"))) {
+  if ($c -and (Test-Path -LiteralPath $c)) {
+    $candidats += New-Object PSObject -Property @{ Ligne=('"' + $c + '" /uninstall'); Source="chemin standard" }
+  }
+}
+# Installations rangees dans un sous-dossier de version
+foreach ($d in @(Get-ChildItem (Join-Path $env:LOCALAPPDATA "Microsoft\OneDrive") -Directory -ErrorAction SilentlyContinue)) {
+  $c = Join-Path $d.FullName "OneDriveSetup.exe"
+  if (Test-Path -LiteralPath $c) {
+    $candidats += New-Object PSObject -Property @{ Ligne=('"' + $c + '" /uninstall'); Source=("version " + $d.Name) }
+  }
+}
+$setup = $null
+if ($candidats.Count -gt 0) { $setup = $candidats[0].Ligne }
 $exe = Join-Path $env:LOCALAPPDATA "Microsoft\OneDrive\OneDrive.exe"
 if (Test-Path -LiteralPath $exe) {
   W ("Installe : " + $exe)
@@ -95,8 +127,20 @@ if (Test-Path -LiteralPath $exe) {
 } else {
   W "Aucun OneDrive.exe trouve dans le profil utilisateur."
 }
-if ($setup) { W ("Programme de desinstallation : " + $setup) }
-else { W "Programme de desinstallation introuvable." }
+W ("Portee de l'installation : " + $portee)
+if ($candidats.Count -gt 0) {
+  W ("Desinstalleurs trouves : " + $candidats.Count)
+  foreach ($c in $candidats) { W ("   [" + $c.Source + "] " + $c.Ligne) }
+} else {
+  W "Aucun programme de desinstallation trouve."
+}
+if ($portee -eq "machine" -and -not $adm) {
+  W ""
+  W "[!] OneDrive est installe POUR TOUTE LA MACHINE et cette fenetre"
+  W "    n'est pas en mode administrateur. La desinstallation va"
+  W "    echouer en silence. Le script proposera de relancer en"
+  W "    administrateur au moment voulu."
+}
 W ""
 
 # ---------- Dossier de donnees ----------
@@ -110,6 +154,7 @@ $dossiers = @(
 $enLigne = 0
 $totalOD = [int64]0
 $nbOD = 0
+$pro = @()
 foreach ($d in $dossiers) {
   W ("Dossier OneDrive : " + $d)
   $nd = 0; $od = [int64]0
@@ -120,6 +165,13 @@ foreach ($d in $dossiers) {
   }
   $nbOD += $nd; $totalOD += $od
   W ("   " + $nd + " fichiers, " + (Go $od) + " occupes sur le disque")
+  # "OneDrive - <Organisation>" est un espace professionnel Microsoft 365,
+  # pas le OneDrive personnel. Les consequences ne sont pas les memes.
+  $nom = Split-Path $d -Leaf
+  if ($nom -match "^OneDrive\s*-\s*(.+)$") {
+    W ("   ESPACE PROFESSIONNEL : " + $matches[1])
+    $pro += New-Object PSObject -Property @{ Chemin=$d; Orga=$matches[1]; N=$nd; O=$od }
+  }
 }
 if ($dossiers.Count -eq 0) { W "Aucun dossier OneDrive dans ce profil." }
 W ""
@@ -159,6 +211,28 @@ if ($rediriges.Count -gt 0) {
 }
 W ""
 
+if ($pro.Count -gt 0) {
+  W "[!] UN COMPTE PROFESSIONNEL EST SYNCHRONISE SUR CE PC."
+  foreach ($x in $pro) {
+    W ("        " + $x.Orga + " : " + $x.N + " fichiers, " + (Go $x.O))
+    W ("        " + $x.Chemin)
+  }
+  W ""
+  W "        Desinstaller OneDrive coupe cette synchronisation. Les"
+  W "        fichiers restent sur le disque, mais ce qui n'a pas"
+  W "        encore ete envoye ne partira jamais vers l'organisation."
+  W "        Or c'est justement le probleme : une synchronisation qui"
+  W "        tourne en rond est une synchronisation qui n'aboutit pas."
+  W ""
+  W "        Avant de desinstaller, faire une copie de ce dossier."
+  W "        Le script la propose."
+  W ""
+  W "        Et si la boucle vient de ce compte, session expiree ou"
+  W "        acces retire par l'organisation, dissocier le compte"
+  W "        (option L) suffit et laisse OneDrive en place."
+  W ""
+}
+
 if ($enLigne -gt 0) {
   $danger = $true
   W ("[STOP] " + $enLigne + " FICHIERS N'EXISTENT QUE DANS LE CLOUD.")
@@ -184,6 +258,12 @@ Write-Host "      Vide le cache de synchronisation et relance proprement."
 Write-Host "      C'est ce qui debloque la plupart des synchronisations qui"
 Write-Host "      tournent en rond, et rien n'est desinstalle. 2 minutes."
 Write-Host ""
+Write-Host "   L  Dissocier un compte, sans rien desinstaller" -ForegroundColor White
+Write-Host "      Arrete la synchronisation d'un compte precis et laisse"
+Write-Host "      ses fichiers sur le disque. La bonne reponse quand la"
+Write-Host "      boucle vient d'un compte professionnel dont l'acces a"
+Write-Host "      expire. Le script affiche les clics exacts."
+Write-Host ""
 Write-Host "   D  Desinstaller OneDrive" -ForegroundColor White
 Write-Host "      Le dossier de donnees et son contenu sont CONSERVES."
 Write-Host "      Reinstallable ensuite depuis onedrive.com."
@@ -195,7 +275,7 @@ if ($danger) {
   Write-Host "  La desinstallation est deconseillee tant qu'il tient." -ForegroundColor Red
   Write-Host ""
 }
-$choix = (Read-Host "  Votre choix (R / D / N)").Trim().ToUpper()
+$choix = (Read-Host "  Votre choix (R / L / D / N)").Trim().ToUpper()
 W ""
 W ("Choix : " + $choix)
 
@@ -221,6 +301,36 @@ if ($choix -eq "R") {
   }
 }
 
+# ---------- Dissociation ----------
+elseif ($choix -eq "L") {
+  W ""
+  W "--- DISSOCIER UN COMPTE ---"
+  W "Cette operation se fait dans l'interface de OneDrive, il n'y a"
+  W "pas de commande fiable pour l'automatiser. Les clics exacts :"
+  W ""
+  W "1. Clic sur l'icone OneDrive, en bas a droite, pres de l'heure."
+  W "   S'il y en a deux, celle du compte professionnel porte un"
+  W "   petit logo d'entreprise."
+  W "2. Roue dentee, puis Parametres."
+  W "3. Onglet Compte."
+  W "4. Sous le compte concerne : Supprimer le lien vers ce PC."
+  W "5. Confirmer."
+  W ""
+  W "Ce qui se passe ensuite : la synchronisation s'arrete, les"
+  W "fichiers deja telecharges restent sur le disque, et rien n'est"
+  W "supprime en ligne. C'est reversible, il suffit de se reconnecter."
+  if ($pro.Count -gt 0) {
+    W ""
+    W "Le compte a dissocier ici est vraisemblablement :"
+    foreach ($x in $pro) { W ("   " + $x.Orga) }
+  }
+  W ""
+  W "Ouverture des parametres de OneDrive."
+  if (Test-Path -LiteralPath $exe) {
+    Start-Process -FilePath $exe -ArgumentList "/settings" -ErrorAction SilentlyContinue
+  }
+}
+
 # ---------- Desinstallation ----------
 elseif ($choix -eq "D") {
   Write-Host ""
@@ -230,9 +340,34 @@ elseif ($choix -eq "D") {
     $c2 = Read-Host "  "
     if ($c2 -ne "JE CONFIRME") { W "Desinstallation annulee."; $choix = "N" }
   } else {
-    Write-Host "  Tapez OUI pour desinstaller OneDrive." -ForegroundColor Yellow
-    $c2 = Read-Host "  "
-    if ($c2.Trim().ToUpper() -ne "OUI") { W "Desinstallation annulee."; $choix = "N" }
+    Write-Host "  Confirmer la desinstallation de OneDrive ?" -ForegroundColor Yellow
+    $c2 = (Read-Host "  Tapez OUI puis Entree").Trim().ToUpper()
+    if (@("OUI","O","OK","YES","Y") -notcontains $c2) {
+      W ("Reponse '" + $c2 + "' non reconnue, desinstallation annulee.")
+      $choix = "N"
+    }
+  }
+
+  if ($choix -eq "D" -and $pro.Count -gt 0) {
+    Write-Host ""
+    Write-Host "  Copier d'abord les dossiers professionnels sur le" -ForegroundColor Yellow
+    Write-Host "  Bureau, par securite ? (O/N)" -ForegroundColor Yellow
+    if ((Read-Host "  ").Trim().ToUpper() -eq "O") {
+      foreach ($x in $pro) {
+        $cible = Join-Path $bureauCopie ("Copie-" + ($x.Orga -replace '[\\/:*?"<>|]','-') + "-" + (Get-Date -Format "yyyy-MM-dd"))
+        W ("Copie de " + $x.Chemin)
+        W ("   vers   " + $cible)
+        try {
+          Copy-Item -LiteralPath $x.Chemin -Destination $cible -Recurse -Force -ErrorAction Stop
+          $n2 = @(Get-ChildItem -LiteralPath $cible -Recurse -File -Force -ErrorAction SilentlyContinue).Count
+          W ("   " + $n2 + " fichiers copies sur " + $x.N + " attendus")
+          if ($n2 -lt $x.N) { W "   [!] Copie incomplete, ne pas desinstaller en l'etat." }
+        } catch {
+          W ("   [!] Echec de la copie : " + $_.Exception.Message)
+          W "   Ne pas desinstaller tant que la copie n'est pas faite."
+        }
+      }
+    }
   }
 
   if ($choix -eq "D") {
@@ -243,15 +378,95 @@ elseif ($choix -eq "D") {
     Get-Process -Name "OneDrive" -ErrorAction SilentlyContinue | Stop-Process -Force
     Start-Sleep -Seconds 3
 
-    W "2. Desinstallation par le programme officiel"
-    if ($setup) {
-      $p = Start-Process -FilePath $setup -ArgumentList "/uninstall" -PassThru -Wait -ErrorAction SilentlyContinue
-      if ($p) { W ("   OneDriveSetup /uninstall termine, code " + $p.ExitCode) }
-      else { W "   Echec du lancement de OneDriveSetup." }
-    } else {
-      W "   OneDriveSetup.exe introuvable, desinstallation manuelle"
-      W "   necessaire : Parametres, Applications, OneDrive."
+    if ($portee -eq "machine" -and -not $adm) {
+      W "2. Elevation necessaire"
+      W "   OneDrive est installe pour toute la machine : sans droits"
+      W "   administrateur la desinstallation echoue en silence."
+      Write-Host ""
+      Write-Host "  Relancer ce script en administrateur ? (O/N)" -ForegroundColor Yellow
+      Write-Host "  Repondez Oui a la fenetre bleue, avec LE MEME compte" -ForegroundColor Yellow
+      Write-Host "  Windows, sinon le script travaillerait sur un autre profil." -ForegroundColor Yellow
+      if ((Read-Host "  ").Trim().ToUpper() -eq "O") {
+        Start-Process powershell.exe -Verb RunAs -ArgumentList @(
+          "-NoProfile","-ExecutionPolicy","Bypass","-File","`"$PSCommandPath`"") -ErrorAction SilentlyContinue
+        W "   Relance en administrateur demandee. Reprenez dans la"
+        W "   nouvelle fenetre."
+        Write-Host ""
+        Write-Host "  Appuyez sur Entree pour fermer celle-ci." -ForegroundColor Cyan
+        Read-Host
+        exit
+      }
+      W "   Poursuite sans elevation, l'echec est probable."
     }
+
+    W "2. Desinstallation"
+    # On essaie chaque desinstalleur trouve, jusqu'a ce qu'OneDrive
+    # ait reellement disparu du disque. Un code de retour a zero ne
+    # prouve rien : seule l'absence du fichier prouve quelque chose.
+    $reussi = $false
+    foreach ($c in $candidats) {
+      if ($reussi) { break }
+      W ("   essai : " + $c.Source)
+      # Le processus se relance tout seul : on le retue juste avant.
+      Get-Process -Name "OneDrive" -ErrorAction SilentlyContinue | Stop-Process -Force
+      Start-Sleep -Seconds 2
+      # Separer l'executable de ses arguments dans la UninstallString
+      $ligne = $c.Ligne.Trim()
+      if ($ligne.StartsWith('"')) {
+        $fin = $ligne.IndexOf('"', 1)
+        $prog = $ligne.Substring(1, $fin - 1)
+        $arguments = $ligne.Substring($fin + 1).Trim()
+      } else {
+        $i = $ligne.IndexOf(" /")
+        if ($i -lt 0) { $prog = $ligne; $arguments = "" }
+        else { $prog = $ligne.Substring(0, $i); $arguments = $ligne.Substring($i).Trim() }
+      }
+      if ($arguments -notmatch "uninstall") { $arguments = ($arguments + " /uninstall").Trim() }
+      if (-not (Test-Path -LiteralPath $prog)) { W ("     introuvable : " + $prog); continue }
+      try {
+        $p = Start-Process -FilePath $prog -ArgumentList $arguments -PassThru -Wait -ErrorAction Stop
+        W ("     code de retour : " + $p.ExitCode)
+      } catch {
+        W ("     echec du lancement : " + $_.Exception.Message)
+        continue
+      }
+      Start-Sleep -Seconds 5
+      if (-not (Test-Path -LiteralPath $exe)) { $reussi = $true; W "     OneDrive.exe a disparu, desinstallation effective" }
+      else { W "     OneDrive.exe est toujours la" }
+    }
+
+    if (-not $reussi) {
+      W "   Aucun desinstalleur n'a abouti. Tentative par winget."
+      $wg = Get-Command winget.exe -ErrorAction SilentlyContinue
+      if ($wg) {
+        $p = Start-Process -FilePath $wg.Source -ArgumentList @(
+          "uninstall","--id","Microsoft.OneDrive","--silent",
+          "--accept-source-agreements") -PassThru -Wait -ErrorAction SilentlyContinue
+        if ($p) { W ("   winget termine, code " + $p.ExitCode) }
+        Start-Sleep -Seconds 5
+        if (-not (Test-Path -LiteralPath $exe)) { $reussi = $true; W "   desinstallation effective" }
+      } else {
+        W "   winget n'est pas disponible sur cette machine."
+      }
+    }
+
+    if (-not $reussi) {
+      W ""
+      W "   [ECHEC] OneDrive est toujours installe."
+      W "   Voie manuelle : Parametres, Applications, Applications"
+      W "   installees, chercher OneDrive, les trois points,"
+      W "   Desinstaller. La fenetre va s'ouvrir."
+      W "   Envoyez ce compte rendu, il contient la liste exacte des"
+      W "   desinstalleurs trouves et les codes de retour."
+      Start-Process "ms-settings:appsfeatures" -ErrorAction SilentlyContinue
+    }
+
+    W ""
+    if (-not $reussi) {
+      W "Nettoyage des reliquats saute : OneDrive est encore installe,"
+      W "retirer son lancement automatique maintenant n'aurait pour"
+      W "effet que de le rendre plus difficile a diagnostiquer."
+    } else {
 
     W "3. Suppression du lancement automatique"
     Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "OneDrive" -ErrorAction SilentlyContinue
@@ -288,6 +503,7 @@ elseif ($choix -eq "D") {
     W ""
     W "Redemarrer le PC pour que l'Explorateur prenne en compte"
     W "le changement."
+    }
   }
 }
 
