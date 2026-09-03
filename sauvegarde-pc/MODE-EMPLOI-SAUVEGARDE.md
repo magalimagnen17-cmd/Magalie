@@ -71,46 +71,28 @@ Ces trois chiffres suffisent pour décider de la suite.
 
 ---
 
-## Étape 2 : la copie, une fois les volumes connus
+## Étape 2 : la synchronisation des dossiers par Drive
 
-Drive pour ordinateur est installé sur la machine. C'est la bonne
-configuration, et elle change tout par rapport au Drive ouvert dans un
-navigateur : Drive apparaît comme un lecteur dans l'Explorateur, en
-général `G:`. Une copie de dossier suffit, elle reprend toute seule
-après une coupure, et un script peut la piloter proprement.
+Drive pour ordinateur est installé, et il sait surveiller des dossiers
+du PC en continu. C'est la meilleure méthode disponible ici, meilleure
+qu'un script de copie : rien à maintenir, reprise automatique après
+coupure, et la sauvegarde reste à jour toute seule ensuite.
 
-Le script d'inventaire vérifie ce point en premier : application
-lancée ou non, lettre réellement attribuée au lecteur (ce n'est pas
-toujours `G:`), présence des dossiers `Mon Drive` et `Drive partagés`.
+La marche à suivre détaillée est dans `SYNCHRO-DOSSIERS-DRIVE.md`.
 
-Deux réglages à vérifier dans Drive avant de lancer une copie, sur ce
-PC en particulier.
+Trois conditions à vérifier avant de l'activer, toutes les trois
+tranchées par le rapport d'inventaire :
 
-**Streaming plutôt que miroir.** Dans les préférences de Drive, un
-dossier peut être « mis en miroir » (les fichiers existent en double,
-sur le disque et dans le cloud) ou « diffusé en streaming » (ils ne
-descendent qu'à l'ouverture). Sur une machine dont le disque est déjà
-serré, le miroir peut la saturer. Le streaming est le bon choix ici.
-
-**Le quota du compte.** Un compte Google gratuit offre 15 Go partagés
-entre Drive, Gmail et Google Photos. La place réellement libre est
-donc toujours inférieure à 15 Go, et elle ne se lit pas depuis le PC :
-il faut la relever sur drive.google.com, en bas à gauche. Si le volume
-à sauvegarder dépasse, trois options : trier et n'envoyer que
-l'essentiel, passer à 200 Go pour environ 2 euros par mois, ou copier
-sur un disque dur externe.
-
-Une fois ces deux chiffres connus, le volume utile d'un côté et la
-place disponible de l'autre, je fournis le script de copie. Il
-travaillera par lots, avec reprise après coupure et journal de ce qui
-est passé, plutôt qu'un glisser-déposer géant qu'une mise en veille
-suffit à interrompre.
-
-Un mot sur la nature de l'opération : une synchronisation n'est pas
-une sauvegarde. Ce qui est supprimé sur le PC disparaît aussi du
-Drive synchronisé. La vraie sécurité, c'est deux copies à deux
-endroits, dont une qui ne suit pas les suppressions. D'où l'intérêt
-du disque externe en complément, même quand tout tient dans Drive.
+1. **La place.** 15 Go partagés entre Drive, Gmail et Photos sur un
+   compte gratuit, donc toujours moins de 15 Go réels.
+2. **Aucun conflit OneDrive.** Un dossier déjà synchronisé par OneDrive
+   ne doit pas être repris par Drive, sinon les deux se disputent les
+   mêmes fichiers et fabriquent des doublons sans fin. L'inventaire
+   marque ces dossiers d'un `[!] CONFLIT ONEDRIVE`.
+3. **La boîte Outlook à part.** Un `.pst` verrouillé par Outlook ouvert
+   ne se copie pas, et en synchronisation continue il repart en entier
+   à chaque mail. À sauvegarder une fois, Outlook fermé, hors du
+   dossier surveillé.
 
 ---
 

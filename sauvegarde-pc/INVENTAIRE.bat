@@ -309,6 +309,85 @@ W ""
 W "Un compte a l'activite ancienne contient souvent encore des"
 W "documents. A verifier avant de reinstaller ou de donner le PC."
 
+# ---------- 7 bis. Points bloquants pour une synchro Drive ----------
+Write-Host "  7b/7  Points bloquants pour une synchronisation..." -ForegroundColor Gray
+T "POINTS BLOQUANTS POUR UNE SYNCHRO GOOGLE DRIVE"
+$bloquant = 0
+
+# 1. Un dossier deja gere par OneDrive ne doit pas etre repris par Drive :
+#    les deux se disputent le meme fichier et fabriquent des doublons.
+$conflit = @($detail | Where-Object { $_.Chemin -like "*OneDrive*" })
+if ($conflit.Count -gt 0) {
+  $bloquant++
+  W "[!] CONFLIT ONEDRIVE"
+  foreach ($c in $conflit) { W ("    " + $c.Nom + " est deja synchronise par OneDrive : " + $c.Chemin) }
+  W "    Ne pas ajouter ces dossiers a la sauvegarde Google Drive."
+  W "    Deux synchronisations sur le meme dossier produisent des"
+  W "    doublons du type 'fichier (2).docx' et des conflits sans fin."
+  W "    Choisir l'un des deux services pour ces dossiers, pas les deux."
+} else {
+  W "[ok] Aucun dossier personnel n'est gere par OneDrive."
+}
+W ""
+
+# 2. Un fichier ouvert en exclusivite ne sera jamais copie proprement.
+#    Le cas classique : la boite Outlook, verrouillee tant qu'Outlook tourne.
+$verrous = @()
+foreach ($f in $mails) {
+  try {
+    $h = [IO.File]::Open($f.FullName, "Open", "Read", "None")
+    $h.Close()
+  } catch { $verrous += $f }
+}
+if ($verrous.Count -gt 0) {
+  $bloquant++
+  W "[!] FICHIERS VERROUILLES PAR UN LOGICIEL OUVERT"
+  foreach ($v in $verrous) { W ("    " + $v.FullName) }
+  W "    Fermer Outlook avant toute sauvegarde de ces fichiers."
+  W "    Un .pst se compte en Go et change a chaque mail recu : laisse"
+  W "    en synchronisation continue, il est renvoye en entier bien"
+  W "    trop souvent. A sauvegarder a part, Outlook ferme, pas en"
+  W "    synchro permanente."
+} else {
+  W "[ok] Aucun fichier mail verrouille a l'instant."
+}
+W ""
+
+# 3. Chemins trop longs et fichiers tres gros : les deux causes
+#    d'echec silencieux les plus frequentes lors d'une premiere synchro.
+$longs = @()
+$enormes = @()
+foreach ($d in $detail) {
+  Get-ChildItem -LiteralPath $d.Chemin -Recurse -File -Force -ErrorAction SilentlyContinue | ForEach-Object {
+    if ($_.FullName.Length -gt 250) { $longs += $_.FullName }
+    if ($_.Length -gt 2GB) { $enormes += $_ }
+  }
+}
+if ($longs.Count -gt 0) {
+  $bloquant++
+  W ("[!] " + $longs.Count + " FICHIERS AU CHEMIN TROP LONG (plus de 250 caracteres)")
+  $longs | Select-Object -First 5 | ForEach-Object { W ("    " + $_) }
+  if ($longs.Count -gt 5) { W ("    ... et " + ($longs.Count - 5) + " autres") }
+  W "    Ils echouent souvent sans message. Raccourcir les noms de"
+  W "    dossiers avant de lancer la synchronisation."
+} else {
+  W "[ok] Aucun chemin excessivement long."
+}
+W ""
+if ($enormes.Count -gt 0) {
+  W ("[i] " + $enormes.Count + " fichiers de plus de 2 Go :")
+  $enormes | Sort-Object Length -Descending | Select-Object -First 5 | ForEach-Object {
+    W ("    {0,10}  {1}" -f (Go $_.Length), $_.FullName)
+  }
+  W "    Ils passeront, mais ils monopoliseront la connexion. Les"
+  W "    envoyer en dernier, ou par le disque externe."
+} else {
+  W "[ok] Aucun fichier de plus de 2 Go."
+}
+W ""
+if ($bloquant -eq 0) { W "Aucun point bloquant. La synchronisation peut etre configuree." }
+else { W ("A regler avant de lancer : " + $bloquant + " point(s) ci-dessus.") }
+
 # ---------- 8. Verdict ----------
 T "VERDICT"
 $utile = $totalPerso
@@ -332,6 +411,21 @@ if ($utile -lt 10GB) {
   W "-> Volume important. Le disque dur externe est la bonne solution."
   W "   Drive servira pour les documents seulement."
 }
+W ""
+W "--- Duree de la premiere synchronisation ---"
+W "Ce qui coince rarement, c'est la place. Ce qui coince toujours,"
+W "c'est le debit MONTANT, souvent dix fois plus faible que le"
+W "descendant sur une ligne domestique."
+foreach ($d in @(1, 5, 20)) {
+  $heures = ($utile * 8) / ($d * 1000000) / 3600
+  if ($heures -lt 1) { $t = ("{0:N0} minutes" -f ($heures*60)) }
+  elseif ($heures -lt 48) { $t = ("{0:N0} heures" -f $heures) }
+  else { $t = ("{0:N1} jours" -f ($heures/24)) }
+  W ("   a {0,2} Mbit/s en montee : {1}" -f $d, $t)
+}
+W "Sur plusieurs jours, laisser le PC allume et brancher la veille"
+W "sur Jamais, sinon la synchronisation s'arrete a chaque mise en"
+W "veille et repart au ralenti."
 W ""
 W "Prochaine etape : envoyer ce rapport, on decide ensuite quoi"
 W "sauvegarder et par quel moyen."
