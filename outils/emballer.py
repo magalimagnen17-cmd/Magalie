@@ -30,7 +30,7 @@ def emballer(chemin_ps1, chemin_bat, titre, admin=False):
         "REM  A DOUBLE-CLIQUER. Rien a taper, rien a coller.",
         "REM  Ce fichier porte le script PowerShell a sa suite.",
         "REM  Il l extrait dans le dossier temporaire puis l execute.",
-        "REM  Aucun reglage de la machine n est modifie.",
+        "REM  Ce que fait le script est decrit en tete de celui-ci.",
         "REM ==========================================================",
     ]
 
