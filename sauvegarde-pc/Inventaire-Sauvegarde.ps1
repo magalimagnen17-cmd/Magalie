@@ -102,6 +102,53 @@ if ($dsk) {
   }
 } else { W "Lecture des disques impossible sur cette machine." }
 
+# ---------- 1 bis. Google Drive ----------
+Write-Host "  1b/7  Google Drive..." -ForegroundColor Gray
+T "GOOGLE DRIVE POUR ORDINATEUR"
+$proc = Get-Process -Name "GoogleDriveFS" -ErrorAction SilentlyContinue
+if ($proc) { W "Application Drive pour ordinateur : EN COURS D'EXECUTION" }
+else {
+  $exe = @(
+    "$env:ProgramFiles\Google\Drive File Stream",
+    "${env:ProgramFiles(x86)}\Google\Drive File Stream",
+    "$env:LOCALAPPDATA\Google\DriveFS"
+  ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+  if ($exe) { W "Application Drive installee mais PAS lancee actuellement." }
+  else      { W "Application Drive pour ordinateur non detectee." }
+}
+
+# Le lecteur Drive n'a pas toujours la lettre G:. On le reconnait a son
+# nom de volume, pas a sa lettre.
+$lecteurs = Get-CimInstance Win32_LogicalDisk -ErrorAction SilentlyContinue |
+            Where-Object { $_.VolumeName -like "*Google Drive*" -or $_.ProviderName -like "*Google*" }
+if ($lecteurs) {
+  foreach ($g in $lecteurs) {
+    W ("Lecteur {0}  nom '{1}'  type {2}" -f $g.DeviceID, $g.VolumeName, $g.DriveType)
+    if ($g.Size -gt 0) {
+      W ("   annonce {0} au total, {1} libres" -f (Go $g.Size), (Go $g.FreeSpace))
+      W "   Attention : en mode streaming, ces chiffres refletent le quota"
+      W "   du compte Google, pas le disque dur de la machine."
+    }
+    foreach ($nom in @("Mon Drive","My Drive","Drive partages","Shared drives")) {
+      $c = Join-Path ($g.DeviceID + "\") $nom
+      if (Test-Path -LiteralPath $c) { W ("   dossier present : " + $c) }
+    }
+  }
+} else {
+  W "Aucun lecteur Google Drive monte pour l'instant."
+  W "Si l'application vient d'etre installee, il faut se connecter au"
+  W "compte Google et attendre que le lecteur apparaisse dans"
+  W "l'Explorateur avant de lancer la copie."
+}
+$ancien = Join-Path $env:USERPROFILE "Google Drive"
+if (Test-Path -LiteralPath $ancien) {
+  $m = Mesure $ancien
+  W ("Dossier local 'Google Drive' : " + (Go $m.Octets) + "  (" + $ancien + ")")
+}
+W ""
+W "Le quota reel du compte ne se lit pas depuis le PC. A relever sur"
+W "drive.google.com, en bas a gauche : 'X Go utilises sur 15 Go'."
+
 # ---------- 2. Dossiers personnels ----------
 Write-Host "  2/7  Dossiers personnels..." -ForegroundColor Gray
 T "DOSSIERS PERSONNELS (le coeur de la sauvegarde)"

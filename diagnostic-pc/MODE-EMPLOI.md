@@ -5,25 +5,51 @@ sans rien modifier sur la machine. Le script est en **lecture seule**.
 
 ---
 
-## Windows
+## Windows, methode simple : `DIAGNOSTIC-PC.bat`
 
-1. Copier le fichier `Diagnostic-PC.ps1` sur le Bureau du PC.
-2. Clic droit sur le bouton Démarrer, choisir **Terminal (admin)** ou
-   **Windows PowerShell (admin)**.
-3. Coller la commande suivante puis Entrée :
+Un seul fichier, rien a taper.
+
+1. Copier `DIAGNOSTIC-PC.bat` sur le Bureau du PC.
+2. Double-cliquer dessus.
+3. Si Windows affiche « Windows a protege votre ordinateur », cliquer
+   sur **Informations complementaires** puis **Executer quand meme**.
+4. Repondre **Oui** a la fenetre bleue de Windows : le test a besoin
+   des droits administrateur pour lire le type de disque et la liste
+   complete des programmes au demarrage. Sans ces droits le rapport
+   sort quand meme, mais incomplet, et il le signale.
+5. La fenetre affiche l'avancement en 12 etapes. Ne pas la fermer
+   avant le message vert TERMINE.
+6. Un fichier `Diagnostic-PC-AAAA-MM-JJ-HHMM.txt` s'ouvre dans le
+   Bloc-notes. Envoyer son contenu.
+
+Le rapport est **horodate**, donc l'ancien n'est jamais ecrase. C'est
+voulu : le seul moyen de mesurer ce que le nettoyage a apporte, c'est
+de comparer deux rapports pris a deux moments.
+
+En tete de chaque rapport, une **synthese** reprend les huit chiffres
+qui bougent : jours depuis le dernier demarrage, charge CPU, RAM totale
+et utilisee, type de disque, espace libre sur `C:`, nombre de
+programmes au demarrage, nombre d'antivirus declares, nombre de
+logiciels installes, erreurs systeme sur 7 jours. C'est cette synthese
+qu'on lit en premier, cote a cote avec celle d'avant.
+
+Le meme geste marche pour `DIAGNOSTIC-RESEAU.bat` si la connexion est
+en cause. Celui-la n'a pas besoin des droits administrateur et fait un
+vrai test de debit, comptez une minute de plus.
+
+### Variante en ligne de commande
+
+1. Copier `Diagnostic-PC.ps1` sur le Bureau.
+2. Clic droit sur le bouton Demarrer, choisir **Terminal (admin)**.
+3. Coller puis Entree :
 
 ```
 powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Desktop\Diagnostic-PC.ps1"
 ```
 
-4. Un fichier `Diagnostic-PC.txt` apparaît sur le Bureau et s'ouvre dans le Bloc-notes.
-5. Envoyer le contenu de ce fichier.
-
-### Variante sans fichier à copier
-
-Ouvrir PowerShell en admin et coller directement le contenu du `.ps1`.
-
----
+Ne pas coller le contenu du `.ps1` directement dans la console : un
+bloc a accolades sur plusieurs lignes met PowerShell en attente sur
+`>>` au lieu de l'executer, et donne l'impression que rien ne se passe.
 
 ## macOS
 

@@ -1,5 +1,24 @@
+# ============================================================
+#  DIAGNOSTIC RESEAU - LECTURE SEULE
+#  Ce script ne modifie RIEN. Il teste la connexion et ecrit
+#  un rapport horodate sur le Bureau.
+# ============================================================
+
 $ProgressPreference = 'SilentlyContinue'
 $ErrorActionPreference = 'SilentlyContinue'
+
+function CheminBureau {
+  $reg = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"
+  $b = (Get-ItemProperty -Path $reg -Name "Desktop" -ErrorAction SilentlyContinue).Desktop
+  if ($b) { $b = [Environment]::ExpandEnvironmentVariables($b) }
+  foreach ($c in @($b, [Environment]::GetFolderPath("Desktop"), (Join-Path $env:USERPROFILE "Desktop"), (Join-Path $env:USERPROFILE "OneDrive\Bureau"))) {
+    if ($c -and (Test-Path -LiteralPath $c)) { return $c }
+  }
+  return $env:TEMP
+}
+$rapport = Join-Path (CheminBureau) ("Diagnostic-Reseau-" + (Get-Date -Format "yyyy-MM-dd-HHmm") + ".txt")
+Start-Transcript -Path $rapport -Force | Out-Null
+
 Clear-Host
 Write-Host "===== DIAGNOSTIC RESEAU - $(Get-Date -Format 'dd/MM/yyyy HH:mm') =====" -ForegroundColor Cyan
 
@@ -69,3 +88,11 @@ Get-Process OneDrive, MsMpEng, msedge, chrome, TiWorker, MoUsoCoreWorker, wuaucl
   Select-Object ProcessName, @{n='Mo';e={[math]::Round($_.WorkingSet64/1MB,0)}} | Format-Table -AutoSize
 
 Write-Host "`n===== FIN =====" -ForegroundColor Cyan
+
+Stop-Transcript | Out-Null
+Write-Host ""
+Write-Host ("  Rapport ecrit ici : " + $rapport) -ForegroundColor Green
+Start-Process notepad.exe -ArgumentList "`"$rapport`"" -ErrorAction SilentlyContinue
+Write-Host ""
+Write-Host "  Appuyez sur Entree pour fermer cette fenetre." -ForegroundColor Cyan
+Read-Host

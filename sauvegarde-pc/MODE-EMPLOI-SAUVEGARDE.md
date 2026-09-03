@@ -71,33 +71,46 @@ Ces trois chiffres suffisent pour décider de la suite.
 
 ---
 
-## Étape 2 : le point à régler avant de copier
+## Étape 2 : la copie, une fois les volumes connus
 
-Google Drive est actuellement ouvert **dans le navigateur**, sur
-drive.google.com. C'est une limite réelle : depuis le site web, aucun
-script ne peut envoyer les fichiers. Il faut glisser-déposer à la main,
-et sur une grosse arborescence, un onglet qui se ferme ou une veille de
-la machine suffit à interrompre le transfert sans prévenir.
+Drive pour ordinateur est installé sur la machine. C'est la bonne
+configuration, et elle change tout par rapport au Drive ouvert dans un
+navigateur : Drive apparaît comme un lecteur dans l'Explorateur, en
+général `G:`. Une copie de dossier suffit, elle reprend toute seule
+après une coupure, et un script peut la piloter proprement.
 
-Deux voies possibles, à choisir après l'inventaire.
+Le script d'inventaire vérifie ce point en premier : application
+lancée ou non, lettre réellement attribuée au lecteur (ce n'est pas
+toujours `G:`), présence des dossiers `Mon Drive` et `Drive partagés`.
 
-**Voie A, recommandée si le volume est raisonnable : installer Drive
-pour ordinateur.** C'est gratuit, c'est l'outil officiel Google.
-Téléchargement sur google.com/drive/download. Une fois installé, Drive
-apparaît comme un lecteur dans l'Explorateur, en général `G:`. À partir
-de là, une simple copie de dossier suffit, elle reprend toute seule
-après une coupure, et un script peut la piloter proprement. Sur un PC
-peu puissant, penser à choisir le mode « streaming » et non le mode
-« miroir », sinon Drive redescend tout sur le disque.
+Deux réglages à vérifier dans Drive avant de lancer une copie, sur ce
+PC en particulier.
 
-**Voie B, si le volume dépasse largement les 15 Go : le disque dur
-externe.** Un disque de 1 To coûte une cinquantaine d'euros et avale
-tout d'un coup, sans quota et sans dépendre de la connexion. Drive sert
-alors uniquement aux documents importants, ce qui les rend accessibles
-depuis n'importe où.
+**Streaming plutôt que miroir.** Dans les préférences de Drive, un
+dossier peut être « mis en miroir » (les fichiers existent en double,
+sur le disque et dans le cloud) ou « diffusé en streaming » (ils ne
+descendent qu'à l'ouverture). Sur une machine dont le disque est déjà
+serré, le miroir peut la saturer. Le streaming est le bon choix ici.
 
-Les deux ne s'excluent pas. La sauvegarde solide, c'est deux copies à
-deux endroits différents.
+**Le quota du compte.** Un compte Google gratuit offre 15 Go partagés
+entre Drive, Gmail et Google Photos. La place réellement libre est
+donc toujours inférieure à 15 Go, et elle ne se lit pas depuis le PC :
+il faut la relever sur drive.google.com, en bas à gauche. Si le volume
+à sauvegarder dépasse, trois options : trier et n'envoyer que
+l'essentiel, passer à 200 Go pour environ 2 euros par mois, ou copier
+sur un disque dur externe.
+
+Une fois ces deux chiffres connus, le volume utile d'un côté et la
+place disponible de l'autre, je fournis le script de copie. Il
+travaillera par lots, avec reprise après coupure et journal de ce qui
+est passé, plutôt qu'un glisser-déposer géant qu'une mise en veille
+suffit à interrompre.
+
+Un mot sur la nature de l'opération : une synchronisation n'est pas
+une sauvegarde. Ce qui est supprimé sur le PC disparaît aussi du
+Drive synchronisé. La vraie sécurité, c'est deux copies à deux
+endroits, dont une qui ne suit pas les suppressions. D'où l'intérêt
+du disque externe en complément, même quand tout tient dans Drive.
 
 ---
 
