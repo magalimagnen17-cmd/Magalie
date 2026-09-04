@@ -5,7 +5,7 @@ REM ==========================================================
 REM  A DOUBLE-CLIQUER. Rien a taper, rien a coller.
 REM  Ce fichier porte le script PowerShell a sa suite.
 REM  Il l extrait dans le dossier temporaire puis l execute.
-REM  Aucun reglage de la machine n est modifie.
+REM  Ce que fait le script est decrit en tete de celui-ci.
 REM ==========================================================
 net session >nul 2>&1
 if not errorlevel 1 goto ADMIN
@@ -170,11 +170,26 @@ if ($sys) { Y ("Disque C:                     : " + $sys) }
 # --- 5. DEMARRAGE -----------------------------------------
 Write-Host "  5/12  Programmes au demarrage..." -ForegroundColor Gray
 W "--- 5. PROGRAMMES QUI SE LANCENT AU DEMARRAGE ---"
-$startup = @(Get-CimInstance Win32_StartupCommand | Select-Object Name, Command, Location)
-if ($startup.Count -gt 0) { $startup | ForEach-Object { W "   - $($_.Name)   [$($_.Location)]" } }
+# Un meme programme est souvent inscrit dans plusieurs profils
+# systeme (S-1-5-18, -19, -20, .DEFAULT). Ces entrees ne demarrent
+# pas dans la session de l'utilisateur : les compter gonflerait le
+# total et fausserait toute comparaison avant / apres.
+$startup = @(Get-CimInstance Win32_StartupCommand | Select-Object Name, Command, Location, User)
+$systeme = @($startup | Where-Object {
+  $_.Location -match "S-1-5-18|S-1-5-19|S-1-5-20|\.DEFAULT" })
+$reels = @($startup | Where-Object {
+  $_.Location -notmatch "S-1-5-18|S-1-5-19|S-1-5-20|\.DEFAULT" })
+
+if ($reels.Count -gt 0) { $reels | ForEach-Object { W "   - $($_.Name)   [$($_.Location)]" } }
 else { W "   (aucun detecte par cette methode)" }
+if ($systeme.Count -gt 0) {
+  W ""
+  W "   Egalement inscrits dans les profils systeme, sans effet sur"
+  W "   la session ouverte, donnes pour information :"
+  $systeme | Select-Object -Unique Name | ForEach-Object { W "      $($_.Name)" }
+}
 W ""
-Y ("Programmes au demarrage       : " + $startup.Count)
+Y ("Programmes au demarrage       : " + $reels.Count)
 
 # --- 6. PROCESSUS GOURMANDS -------------------------------
 Write-Host "  6/12  Processus..." -ForegroundColor Gray
