@@ -69,3 +69,61 @@ Edge est encore le navigateur par défaut, ce qui doit être changé avant
 toute suppression, et un seul favori existait, exporté sur le Bureau.
 `EDGE.bat` propose l'option N, neutraliser, qui donne le même confort
 sans exposer Windows Update.
+
+
+---
+
+# Mise à jour du 04/09/2026 au matin
+
+## Décision prise sur les photos
+
+Les fichiers originaux restent sur le disque du PC, et on sauvegarde
+dans Drive ce qui tient dans le gratuit. Pas de forfait, pas de disque
+externe pour l'instant.
+
+## Ce que l'analyse de recouvrement a montré
+
+Le ménage ne libère presque rien : **96 Mo**, et 425 Mo d'Images sont
+déjà à l'abri via Documents. Les dossiers `Nouveau dossier` de
+Documents, qu'on soupçonnait d'être des copies des photos, contiennent
+en réalité **du contenu qui n'existe que là** : 2,32 Go pour le (2),
+1,26 Go pour le premier, 951 Mo pour le (3). Il ne faut donc surtout
+pas les supprimer.
+
+Un seul dossier est réellement redondant : `Images\anniversaire
+valentin`, dont 87 % existe ailleurs, avec 8 fichiers uniques listés
+dans le rapport.
+
+Bilan : il manque 5,98 Go pour tout sauvegarder, et aucun nettoyage ne
+comblera cet écart.
+
+## La méthode retenue : séparer les photos des vidéos
+
+Drive synchronise des dossiers entiers, pas des types de fichiers.
+Pour ne sauvegarder que les photos, il faut donc que les vidéos soient
+ailleurs.
+
+Or le dossier **Vidéos de Windows est vide**, alors que 13 Go de `.MOV`
+venus du téléphone sont rangés dans Images. `SEPARER.bat` les remet à
+leur place en conservant l'arborescence : `Images\giulia\x.MOV` devient
+`Videos\giulia\x.MOV`.
+
+Le script mesure d'abord, ne déplace rien sans confirmation, n'écrase
+jamais un fichier de même nom, et écrit sur le Bureau un journal
+listant chaque ancien et nouveau chemin pour pouvoir revenir en
+arrière.
+
+Images allégé de ses vidéos devrait tenir dans les 5,82 Go restants.
+Le rapport donne un cumul dossier par dossier pour trancher au cas où
+il faudrait descendre plus finement.
+
+## Le risque assumé, et il est réel
+
+Les vidéos resteront sur ce seul disque, sauvegardées nulle part. Ce
+sont des anniversaires, un baptême, des vacances. Le disque est un
+WDC WD5000LPCX, mécanique, et un disque mécanique finit toujours par
+s'arrêter.
+
+Une clé USB de 32 Go, moins de dix euros, suffirait à les mettre à
+l'abri. C'est la seule dépense qui vaut vraiment la peine d'être
+reconsidérée.
